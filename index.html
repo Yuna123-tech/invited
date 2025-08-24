@@ -182,6 +182,7 @@
         const toggleSelectionBtn = document.getElementById('toggle-selection-btn');
 
         let currentUser = null;
+        let currentEntries = []; // <-- 이 한 줄을 추가하세요
         let userHasSubmitted = false;
         let userHasSelected = false;
         let isSelectionOpen = false;
@@ -256,6 +257,7 @@ function setupEntriesListener() {
     onSnapshot(manitoCollection, (snapshot) => {
         const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         entries.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+        currentEntries = entries;
 
         userHasSubmitted = entries.some(entry => entry.authorId === currentUser.uid);
         userHasSelected = entries.some(entry => entry.selectedBy === currentUser.uid);
@@ -290,20 +292,18 @@ function setupEntriesListener() {
     });
 }
 
-// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 여기까지 복사 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-        
-        function updateUIBasedOnSelectionState() {
-            if (currentUser && currentUser.uid === ADMIN_UID) {
-                selectionStatus.textContent = isSelectionOpen ? '진행 중' : '마감';
-                toggleSelectionBtn.textContent = isSelectionOpen ? '마니또 선택 마감하기' : '마니또 선택 시작하기';
-            }
-            // 전체 카드를 다시 렌더링하여 상태(버튼 등)를 업데이트
-            onSnapshot(collection(db, "manito-entries"), (snapshot) => {
-                const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                entries.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
-                renderEntries(entries);
-            });
-        }
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 코드로 교체하세요 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+
+function updateUIBasedOnSelectionState() {
+    if (currentUser && currentUser.uid === ADMIN_UID) {
+        selectionStatus.textContent = isSelectionOpen ? '진행 중' : '마감';
+        toggleSelectionBtn.textContent = isSelectionOpen ? '마니또 선택 마감하기' : '마니또 선택 시작하기';
+    }
+    // 이제 데이터베이스를 다시 읽는 대신, 저장해둔 최신 데이터로 화면만 다시 그립니다.
+    renderEntries(currentEntries);
+}
+
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 여기까지 교체합니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
         function renderEntries(entries) {
             entriesList.innerHTML = '';
