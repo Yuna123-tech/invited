@@ -90,6 +90,7 @@
         </div>
     </div>
 
+    <!-- 알림용 Modal -->
     <div id="modal" class="fixed inset-0 bg-gray-800 bg-opacity-60 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
         <div class="relative p-5 border w-full max-w-md shadow-lg rounded-2xl bg-white">
             <div class="mt-3 text-center">
@@ -105,16 +106,40 @@
             </div>
         </div>
     </div>
+    
+    <!-- 수정용 Modal -->
+    <div id="edit-modal" class="fixed inset-0 bg-gray-800 bg-opacity-60 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+        <div class="relative p-6 border w-full max-w-lg shadow-lg rounded-2xl bg-white">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">내 글 수정하기</h3>
+            <div class="space-y-4">
+                <div>
+                    <label for="edit-introduction" class="block text-sm font-medium text-gray-700">나를 소개하는 한 줄</label>
+                    <input type="text" id="edit-introduction" class="mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="edit-quote" class="block text-sm font-medium text-gray-700">좋아하는 글귀나 명언</label>
+                    <textarea id="edit-quote" rows="4" class="mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                </div>
+            </div>
+            <div class="flex items-center justify-end mt-6 space-x-3">
+                <button id="cancel-edit-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none">
+                    취소
+                </button>
+                <button id="save-edit-btn" class="px-4 py-2 bg-indigo-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-indigo-600 focus:outline-none">
+                    수정 완료
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ===================================================================================
         // ★★★ 중요 ★★★
-        // 1단계에서 복사한 Firebase 설정 객체를 아래에 붙여넣으세요.
-        const firebaseConfig = {
+       const firebaseConfig = {
     apiKey: "AIzaSyA6pOWP9oihx4lz3gNxn2L-pAvABW5_-tk",
     authDomain: "g-deal-workshop.firebaseapp.com",
     projectId: "g-deal-workshop",
@@ -131,7 +156,6 @@
         
         // ===================================================================================
         // ★★★ 관리자 설정 ★★★
-        // 관리자의 UID는 앱에 접속했을 때 상단에 표시되는 '당신의 고유 ID' 값을 복사해서 붙여넣으세요.
         const ADMIN_UID = "l5GmHDjOCFcwSOLleHj1jE7XVCE3"; 
         // ===================================================================================
 
@@ -141,10 +165,18 @@
         const entriesList = document.getElementById('entries-list');
         const authInfo = document.getElementById('auth-info');
         const manitoFormContainer = document.getElementById('manito-form-container');
+        
         const modal = document.getElementById('modal');
         const modalTitle = document.getElementById('modal-title');
         const modalContent = document.getElementById('modal-content');
         const modalClose = document.getElementById('modal-close');
+        
+        const editModal = document.getElementById('edit-modal');
+        const editIntroductionInput = document.getElementById('edit-introduction');
+        const editQuoteInput = document.getElementById('edit-quote');
+        const saveEditBtn = document.getElementById('save-edit-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
         const adminPanel = document.getElementById('admin-panel');
         const selectionStatus = document.getElementById('selection-status');
         const toggleSelectionBtn = document.getElementById('toggle-selection-btn');
@@ -153,6 +185,7 @@
         let userHasSubmitted = false;
         let userHasSelected = false;
         let isSelectionOpen = false;
+        let currentEditingDocId = null;
 
         function showModal(title, content) {
             modalTitle.textContent = title;
@@ -166,18 +199,13 @@
             if (user) {
                 currentUser = user;
                 authInfo.innerHTML = `<p class="font-semibold">환영합니다! 당신의 고유 ID: <span class="font-mono bg-indigo-200 px-2 py-1 rounded">${currentUser.uid}</span></p>`;
-                
-                if (currentUser.uid === ADMIN_UID) {
-                    adminPanel.classList.remove('hidden');
-                }
-                
+                if (currentUser.uid === ADMIN_UID) adminPanel.classList.remove('hidden');
                 setupAdminControlsListener();
                 setupEntriesListener();
             } else {
                 try {
                     await signInAnonymously(auth);
                 } catch (error) {
-                    console.error("Authentication error:", error);
                     authInfo.textContent = '인증에 실패했습니다. 새로고침 해주세요.';
                 }
             }
@@ -197,17 +225,14 @@
             submitBtn.disabled = true;
             submitBtn.textContent = '제출 중...';
             try {
-                const manitoCollection = collection(db, "manito-entries");
-                await addDoc(manitoCollection, {
-                    introduction: introduction,
-                    quote: quote,
+                await addDoc(collection(db, "manito-entries"), {
+                    introduction, quote,
                     authorId: currentUser.uid,
                     selectedBy: null,
                     timestamp: serverTimestamp()
                 });
                 showModal('성공', '성공적으로 제출되었습니다!');
             } catch (error) {
-                console.error("Error adding document: ", error);
                 showModal('오류', '제출 중 오류가 발생했습니다.');
             } finally {
                 submitBtn.disabled = false;
@@ -216,8 +241,7 @@
         });
         
         function setupAdminControlsListener() {
-            const settingsRef = doc(db, "admin-controls", "settings");
-            onSnapshot(settingsRef, (docSnap) => {
+            onSnapshot(doc(db, "admin-controls", "settings"), (docSnap) => {
                 isSelectionOpen = docSnap.exists() ? docSnap.data().selectionOpen : false;
                 updateUIBasedOnSelectionState();
             });
@@ -225,8 +249,7 @@
 
         function setupEntriesListener() {
             if (!currentUser) return;
-            const manitoCollection = collection(db, "manito-entries");
-            onSnapshot(manitoCollection, (snapshot) => {
+            onSnapshot(collection(db, "manito-entries"), (snapshot) => {
                 const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 entries.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
 
@@ -234,7 +257,9 @@
                 userHasSelected = entries.some(entry => entry.selectedBy === currentUser.uid);
 
                 if (userHasSubmitted) {
-                    manitoFormContainer.innerHTML = '<p class="text-center text-green-700 font-semibold p-4 bg-green-100 rounded-lg">제출이 완료되었습니다. 이제 마니또를 선택해주세요!</p>';
+                    manitoFormContainer.style.display = 'none';
+                } else {
+                    manitoFormContainer.style.display = 'block';
                 }
                 
                 renderEntries(entries);
@@ -246,9 +271,8 @@
                 selectionStatus.textContent = isSelectionOpen ? '진행 중' : '마감';
                 toggleSelectionBtn.textContent = isSelectionOpen ? '마니또 선택 마감하기' : '마니또 선택 시작하기';
             }
-            // 카드 상태를 다시 렌더링하기 위해 entries 리스너를 재호출하지 않고, 현재 데이터를 기반으로 다시 그립니다.
-            const manitoCollection = collection(db, "manito-entries");
-            onSnapshot(manitoCollection, (snapshot) => {
+            // 전체 카드를 다시 렌더링하여 상태(버튼 등)를 업데이트
+            onSnapshot(collection(db, "manito-entries"), (snapshot) => {
                 const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 entries.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
                 renderEntries(entries);
@@ -266,37 +290,59 @@
         function createEntryCard(entry) {
             const card = document.createElement('div');
             card.className = 'p-4 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col justify-between transition-transform hover:scale-105';
-            card.innerHTML = `<div class="flex-grow"><p class="text-sm text-gray-500 mb-2">"${entry.introduction}"</p><p class="font-serif text-lg italic text-gray-800">"${entry.quote}"</p></div>`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'flex-grow';
+            contentDiv.innerHTML = `<p class="text-sm text-gray-500 mb-2">"${entry.introduction}"</p><p class="font-serif text-lg italic text-gray-800">"${entry.quote}"</p>`;
+            card.appendChild(contentDiv);
             
             const buttonContainer = document.createElement('div');
             buttonContainer.className = 'mt-4 pt-4 border-t border-gray-100';
 
-            const canSelect = isSelectionOpen && userHasSubmitted && !userHasSelected && !entry.selectedBy && entry.authorId !== currentUser.uid;
+            // 내가 쓴 글인 경우
+            if (entry.authorId === currentUser.uid) {
+                // 아직 선택이 시작되지 않았고, 아무도 나를 선택하지 않았을 때만 수정/삭제 가능
+                if (!isSelectionOpen && !entry.selectedBy) {
+                    const editBtn = document.createElement('button');
+                    editBtn.textContent = '수정';
+                    editBtn.className = 'w-1/2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-l-md transition duration-300';
+                    editBtn.onclick = () => openEditModal(entry);
 
-            if (entry.selectedBy) {
-                const status = document.createElement('p');
-                status.className = 'text-center text-red-500 font-bold p-2 bg-red-100 rounded-md';
-                status.textContent = '임자 있어요';
-                buttonContainer.appendChild(status);
-            } else if (entry.authorId === currentUser.uid) {
-                const status = document.createElement('p');
-                status.className = 'text-center text-blue-500 font-bold p-2 bg-blue-100 rounded-md';
-                status.textContent = '내가 쓴 글';
-                buttonContainer.appendChild(status);
-            } else if (canSelect) {
-                const selectBtn = document.createElement('button');
-                selectBtn.textContent = '이 분의 마니또 되기';
-                selectBtn.className = 'w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300';
-                selectBtn.onclick = () => selectManito(entry.id);
-                buttonContainer.appendChild(selectBtn);
-            } else {
-                 const status = document.createElement('p');
-                 status.className = 'text-center text-gray-500 font-bold p-2 bg-gray-100 rounded-md';
-                 if (!isSelectionOpen) status.textContent = '선택 대기 중';
-                 else if (!userHasSubmitted) status.textContent = '먼저 글을 제출해주세요';
-                 else if (userHasSelected) status.textContent = '선택 완료';
-                 else status.textContent = '선택 불가';
-                 buttonContainer.appendChild(status);
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = '삭제';
+                    deleteBtn.className = 'w-1/2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-r-md transition duration-300';
+                    deleteBtn.onclick = () => confirmDelete(entry.id);
+                    
+                    buttonContainer.append(editBtn, deleteBtn);
+                } else {
+                    const status = document.createElement('p');
+                    status.className = 'text-center text-blue-500 font-bold p-2 bg-blue-100 rounded-md';
+                    status.textContent = '내가 쓴 글';
+                    buttonContainer.appendChild(status);
+                }
+            } 
+            // 다른 사람 글인 경우
+            else {
+                if (entry.selectedBy) {
+                    const status = document.createElement('p');
+                    status.className = 'text-center text-red-500 font-bold p-2 bg-red-100 rounded-md';
+                    status.textContent = '임자 있어요';
+                    buttonContainer.appendChild(status);
+                } else if (isSelectionOpen && userHasSubmitted && !userHasSelected) {
+                    const selectBtn = document.createElement('button');
+                    selectBtn.textContent = '이 분의 마니또 되기';
+                    selectBtn.className = 'w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300';
+                    selectBtn.onclick = () => selectManito(entry.id);
+                    buttonContainer.appendChild(selectBtn);
+                } else {
+                    const status = document.createElement('p');
+                    status.className = 'text-center text-gray-500 font-bold p-2 bg-gray-100 rounded-md';
+                    if (!isSelectionOpen) status.textContent = '선택 대기 중';
+                    else if (!userHasSubmitted) status.textContent = '먼저 글을 제출해주세요';
+                    else if (userHasSelected) status.textContent = '선택 완료';
+                    else status.textContent = '선택 불가';
+                    buttonContainer.appendChild(status);
+                }
             }
 
             card.appendChild(buttonContainer);
@@ -309,26 +355,73 @@
                 return;
             }
             try {
-                const entryRef = doc(db, "manito-entries", docId);
-                await updateDoc(entryRef, { selectedBy: currentUser.uid });
+                await updateDoc(doc(db, "manito-entries", docId), { selectedBy: currentUser.uid });
                 showModal('성공!', '마니또 선택이 완료되었습니다! 누가 주인공일지 기대되네요!');
             } catch (error) {
-                console.error("Error updating document: ", error);
                 showModal('오류', '선택 중 오류가 발생했습니다.');
             }
         }
         
         toggleSelectionBtn.addEventListener('click', async () => {
             const newState = !isSelectionOpen;
-            const settingsRef = doc(db, "admin-controls", "settings");
             try {
-                await setDoc(settingsRef, { selectionOpen: newState });
+                await setDoc(doc(db, "admin-controls", "settings"), { selectionOpen: newState });
                 showModal('성공', `마니또 선택을 ${newState ? '시작' : '마감'}했습니다.`);
             } catch (error) {
-                console.error("Error updating settings: ", error);
                 showModal('오류', '상태 변경 중 오류가 발생했습니다.');
             }
         });
+
+        // --- 수정 및 삭제 관련 함수들 ---
+
+        function openEditModal(entry) {
+            currentEditingDocId = entry.id;
+            editIntroductionInput.value = entry.introduction;
+            editQuoteInput.value = entry.quote;
+            editModal.classList.remove('hidden');
+        }
+
+        cancelEditBtn.addEventListener('click', () => {
+            editModal.classList.add('hidden');
+            currentEditingDocId = null;
+        });
+
+        saveEditBtn.addEventListener('click', async () => {
+            const newIntroduction = editIntroductionInput.value.trim();
+            const newQuote = editQuoteInput.value.trim();
+
+            if (!newIntroduction || !newQuote) {
+                showModal('입력 오류', '모든 필드를 채워주세요.');
+                return;
+            }
+
+            try {
+                const entryRef = doc(db, "manito-entries", currentEditingDocId);
+                await updateDoc(entryRef, {
+                    introduction: newIntroduction,
+                    quote: newQuote
+                });
+                editModal.classList.add('hidden');
+                showModal('성공', '글이 성공적으로 수정되었습니다.');
+            } catch (error) {
+                showModal('오류', '수정 중 오류가 발생했습니다.');
+            }
+        });
+
+        function confirmDelete(docId) {
+            if (confirm('정말로 이 글을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
+                deleteEntry(docId);
+            }
+        }
+
+        async function deleteEntry(docId) {
+            try {
+                await deleteDoc(doc(db, "manito-entries", docId));
+                showModal('성공', '글이 삭제되었습니다.');
+            } catch (error) {
+                showModal('오류', '삭제 중 오류가 발생했습니다.');
+            }
+        }
     </script>
 </body>
 </html>
