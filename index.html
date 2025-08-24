@@ -287,79 +287,84 @@
             });
         }
 
-        function createEntryCard(entry) {
-            const card = document.createElement('div');
-            card.className = 'p-4 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col justify-between transition-transform hover:scale-105';
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'flex-grow';
-            contentDiv.innerHTML = `<p class="text-sm text-gray-500 mb-2">"${entry.introduction}"</p><p class="font-serif text-lg italic text-gray-800">"${entry.quote}"</p>`;
-            card.appendChild(contentDiv);
-            
-            const buttonContainer = document.createElement('div');
-            buttonContainer.className = 'mt-4 pt-4 border-t border-gray-100';
+       // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 여기부터 복사 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼
 
-            // 내가 쓴 글인 경우
-            if (entry.authorId === currentUser.uid) {
-                // 아직 선택이 시작되지 않았고, 아무도 나를 선택하지 않았을 때만 수정/삭제 가능
-if ((!isSelectionOpen && !entry.selectedBy) || currentUser.uid === ADMIN_UID) {
-                    const editBtn = document.createElement('button');
-                    editBtn.textContent = '수정';
-                    editBtn.className = 'w-1/2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-l-md transition duration-300';
-                    editBtn.onclick = () => openEditModal(entry);
-
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.textContent = '삭제';
-                    deleteBtn.className = 'w-1/2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-r-md transition duration-300';
-                    deleteBtn.onclick = () => confirmDelete(entry.id);
-                    
-                    buttonContainer.append(editBtn, deleteBtn);
-                } else {
-                    const status = document.createElement('p');
-                    status.className = 'text-center text-blue-500 font-bold p-2 bg-blue-100 rounded-md';
-                    status.textContent = '내가 쓴 글';
-                    buttonContainer.appendChild(status);
-                }
-            } 
-            // 다른 사람 글인 경우
-            else {
-                if (entry.selectedBy) {
-                    const status = document.createElement('p');
-                    status.className = 'text-center text-red-500 font-bold p-2 bg-red-100 rounded-md';
-                    status.textContent = '임자 있어요';
-                    buttonContainer.appendChild(status);
-                } else if (isSelectionOpen && userHasSubmitted && !userHasSelected) {
-                    const selectBtn = document.createElement('button');
-                    selectBtn.textContent = '이 분의 마니또 되기';
-                    selectBtn.className = 'w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300';
-                    selectBtn.onclick = () => selectManito(entry.id);
-                    buttonContainer.appendChild(selectBtn);
-                } else {
-                    const status = document.createElement('p');
-                    status.className = 'text-center text-gray-500 font-bold p-2 bg-gray-100 rounded-md';
-                    if (!isSelectionOpen) status.textContent = '선택 대기 중';
-                    else if (!userHasSubmitted) status.textContent = '먼저 글을 제출해주세요';
-                    else if (userHasSelected) status.textContent = '선택 완료';
-                    else status.textContent = '선택 불가';
-                    buttonContainer.appendChild(status);
-                }
-            }
-// --- [추가 시작] 관리자용 삭제 버튼 ---
-// 현재 사용자가 관리자이고, 내가 쓴 글이 아닐 경우에만 관리자 삭제 버튼을 표시합니다.
-if (currentUser && currentUser.uid === ADMIN_UID && entry.authorId !== currentUser.uid) {
-    const adminDeleteBtn = document.createElement('button');
-    adminDeleteBtn.textContent = '관리자 삭제';
-    // 버튼 스타일을 작고 눈에 덜 띄게 만들어 사용자 버튼과 구분합니다.
-    adminDeleteBtn.className = 'w-full mt-2 bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-1 px-2 rounded-md transition duration-300';
-    adminDeleteBtn.onclick = () => confirmDelete(entry.id);
+function createEntryCard(entry) {
+    const card = document.createElement('div');
+    card.className = 'p-4 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col justify-between transition-transform hover:scale-105';
     
-    // 기존 버튼 컨테이너에 추가합니다.
-    buttonContainer.appendChild(adminDeleteBtn);
-}
-// --- [추가 끝] ---
-            card.appendChild(buttonContainer);
-            return card;
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'flex-grow';
+    contentDiv.innerHTML = `<p class="text-sm text-gray-500 mb-2">"${entry.introduction}"</p><p class="font-serif text-lg italic text-gray-800">"${entry.quote}"</p>`;
+    card.appendChild(contentDiv);
+    
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'mt-4 pt-4 border-t border-gray-100';
+
+    const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
+
+    // Case 1: 내가 쓴 글일 경우
+    if (entry.authorId === currentUser.uid) {
+        // 수정/삭제가 가능한 조건: (선택 시작 전 && 선택 안됨) 이거나, 내가 관리자일 경우
+        const canEdit = (!isSelectionOpen && !entry.selectedBy) || isAdmin;
+
+        if (canEdit) {
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '수정';
+            editBtn.className = 'w-1/2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-l-md transition duration-300';
+            editBtn.onclick = () => openEditModal(entry);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '삭제';
+            deleteBtn.className = 'w-1/2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-r-md transition duration-300';
+            deleteBtn.onclick = () => confirmDelete(entry.id);
+            
+            buttonContainer.append(editBtn, deleteBtn);
+        } else {
+            const status = document.createElement('p');
+            status.className = 'text-center text-blue-500 font-bold p-2 bg-blue-100 rounded-md';
+            status.textContent = '내가 쓴 글';
+            buttonContainer.appendChild(status);
         }
+    } 
+    // Case 2: 다른 사람의 글일 경우
+    else {
+        if (entry.selectedBy) {
+            const status = document.createElement('p');
+            status.className = 'text-center text-red-500 font-bold p-2 bg-red-100 rounded-md';
+            status.textContent = '임자 있어요';
+            buttonContainer.appendChild(status);
+        } else if (isSelectionOpen && userHasSubmitted && !userHasSelected) {
+            const selectBtn = document.createElement('button');
+            selectBtn.textContent = '이 분의 마니또 되기';
+            selectBtn.className = 'w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300';
+            selectBtn.onclick = () => selectManito(entry.id);
+            buttonContainer.appendChild(selectBtn);
+        } else {
+            const status = document.createElement('p');
+            status.className = 'text-center text-gray-500 font-bold p-2 bg-gray-100 rounded-md';
+            if (!isSelectionOpen) status.textContent = '선택 대기 중';
+            else if (!userHasSubmitted) status.textContent = '먼저 글을 제출해주세요';
+            else if (userHasSelected) status.textContent = '선택 완료';
+            else status.textContent = '선택 불가';
+            buttonContainer.appendChild(status);
+        }
+
+        // 추가 조건: 내가 관리자라면, 다른 사람 글에 '관리자 삭제' 버튼을 추가
+        if (isAdmin) {
+            const adminDeleteBtn = document.createElement('button');
+            adminDeleteBtn.textContent = '관리자 삭제';
+            adminDeleteBtn.className = 'w-full mt-2 bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-1 px-2 rounded-md transition duration-300';
+            adminDeleteBtn.onclick = () => confirmDelete(entry.id);
+            buttonContainer.appendChild(adminDeleteBtn);
+        }
+    }
+
+    card.appendChild(buttonContainer);
+    return card;
+}
+
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 여기까지 복사 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         async function selectManito(docId) {
             if (!isSelectionOpen || !userHasSubmitted || userHasSelected) {
