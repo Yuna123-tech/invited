@@ -81,8 +81,19 @@
                 </div>
 
                 <div>
+                    <!-- ★★★ 바로 이 부분이 이전에 누락되었던 HTML 코드입니다! ★★★ -->
+                    <!-- 내가 선택한 마니또 표시 영역 -->
+                    <div id="my-manito-display" class="hidden mb-6 p-4 bg-teal-100 border border-teal-300 rounded-lg">
+                        <h3 class="text-xl font-bold text-center text-teal-800 mb-2 font-playfair">✨ 당신은 이 분의 비밀 마니또입니다 ✨</h3>
+                        <div class="text-center bg-white p-3 rounded-md">
+                            <p id="my-manito-introduction" class="text-sm text-gray-700 mb-2"></p>
+                            <p id="my-manito-quote" class="font-serif text-lg italic text-teal-900"></p>
+                        </div>
+                    </div>
+                    <!-- ★★★ 여기까지 입니다 ★★★ -->
+
                     <h3 class="text-2xl font-playfair font-bold text-center mb-2 text-gray-800">Choose Your Manito</h3>
-                    <p class="text-center text-gray-500 mb-6">마음에 드는 글귀를 선택해 그 분의 마니또가 되어주세요. (선착순! 선택은 단 한 번!)</p>
+                    <p class="text-center text-gray-500 mb-6">마음에 드는 글귀를 선택해 그 분의 마니또가 되어주세요. (선택은 단 한 번!)</p>
                     <div id="entries-list" class="grid md:grid-cols-2 gap-4">
                     </div>
                 </div>
@@ -138,8 +149,8 @@
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ===================================================================================
-        // ★★★ 중요 ★★★
-       const firebaseConfig = {
+        // ★★★ 중요 ★★★ 여기에 본인의 Firebase 설정 정보를 붙여넣으세요!
+     const firebaseConfig = {
     apiKey: "AIzaSyA6pOWP9oihx4lz3gNxn2L-pAvABW5_-tk",
     authDomain: "g-deal-workshop.firebaseapp.com",
     projectId: "g-deal-workshop",
@@ -155,39 +166,39 @@
         const auth = getAuth(app);
         
         // ===================================================================================
-        // ★★★ 관리자 설정 ★★★
+        // ★★★ 관리자 설정 ★★★ 여기에 관리자 UID를 입력하세요!
         const ADMIN_UID = "l5GmHDjOCFcwSOLleHj1jE7XVCE3"; 
         // ===================================================================================
 
+        // --- DOM Elements ---
         const introductionInput = document.getElementById('introduction');
         const quoteInput = document.getElementById('quote');
         const submitBtn = document.getElementById('submit-btn');
         const entriesList = document.getElementById('entries-list');
         const authInfo = document.getElementById('auth-info');
         const manitoFormContainer = document.getElementById('manito-form-container');
-        
         const modal = document.getElementById('modal');
         const modalTitle = document.getElementById('modal-title');
         const modalContent = document.getElementById('modal-content');
         const modalClose = document.getElementById('modal-close');
-        
         const editModal = document.getElementById('edit-modal');
         const editIntroductionInput = document.getElementById('edit-introduction');
         const editQuoteInput = document.getElementById('edit-quote');
         const saveEditBtn = document.getElementById('save-edit-btn');
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
-
         const adminPanel = document.getElementById('admin-panel');
         const selectionStatus = document.getElementById('selection-status');
         const toggleSelectionBtn = document.getElementById('toggle-selection-btn');
 
+        // --- Global State ---
         let currentUser = null;
-        let currentEntries = []; // <-- 이 한 줄을 추가하세요
+        let currentEntries = []; // 실시간 데이터를 저장할 배열
         let userHasSubmitted = false;
         let userHasSelected = false;
         let isSelectionOpen = false;
         let currentEditingDocId = null;
 
+        // --- Functions ---
         function showModal(title, content) {
             modalTitle.textContent = title;
             modalContent.textContent = content;
@@ -248,63 +259,114 @@
             });
         }
 
- // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 여기서부터 복사 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+        function setupEntriesListener() {
+            if (!currentUser) return;
+            onSnapshot(collection(db, "manito-entries"), (snapshot) => {
+                const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                entries.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+                
+                currentEntries = entries; // 실시간 데이터를 전역 변수에 저장
 
-function setupEntriesListener() {
-    if (!currentUser) return;
+                userHasSubmitted = entries.some(entry => entry.authorId === currentUser.uid);
+                userHasSelected = entries.some(entry => entry.selectedBy === currentUser.uid);
 
-    const manitoCollection = collection(db, "manito-entries");
-    onSnapshot(manitoCollection, (snapshot) => {
-        const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        entries.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
-        currentEntries = entries;
+                if (userHasSubmitted) {
+                    manitoFormContainer.style.display = 'none';
+                } else {
+                    manitoFormContainer.style.display = 'block';
+                }
+                
+                const myManitoDisplay = document.getElementById('my-manito-display');
+                const myManitoIntroduction = document.getElementById('my-manito-introduction');
+                const myManitoQuote = document.getElementById('my-manito-quote');
 
-        userHasSubmitted = entries.some(entry => entry.authorId === currentUser.uid);
-        userHasSelected = entries.some(entry => entry.selectedBy === currentUser.uid);
+                const mySelection = entries.find(entry => entry.selectedBy === currentUser.uid);
 
-        // 내가 제출한 글이 있으면 폼 숨기기, 없으면 보여주기
-        if (userHasSubmitted) {
-            manitoFormContainer.style.display = 'none';
-        } else {
-            manitoFormContainer.style.display = 'block';
+                if (mySelection) {
+                    myManitoIntroduction.textContent = `"${mySelection.introduction}"`;
+                    myManitoQuote.textContent = `"${mySelection.quote}"`;
+                    myManitoDisplay.classList.remove('hidden');
+                } else {
+                    myManitoDisplay.classList.add('hidden');
+                }
+
+                renderEntries(entries);
+            });
         }
         
-        // --- [새로 추가된 로직] 내가 선택한 마니또 정보 표시 ---
-        const myManitoDisplay = document.getElementById('my-manito-display');
-        const myManitoIntroduction = document.getElementById('my-manito-introduction');
-        const myManitoQuote = document.getElementById('my-manito-quote');
-
-        // 내가 선택한 사람(mySelection)이 있는지 찾기
-        const mySelection = entries.find(entry => entry.selectedBy === currentUser.uid);
-
-        if (mySelection) {
-            // 있다면, 전용 섹션에 정보(소개, 글귀)를 채우고 보여주기
-            myManitoIntroduction.textContent = `"${mySelection.introduction}"`;
-            myManitoQuote.textContent = `"${mySelection.quote}"`;
-            myManitoDisplay.classList.remove('hidden');
-        } else {
-            // 없다면, 전용 섹션을 숨기기
-            myManitoDisplay.classList.add('hidden');
+        function updateUIBasedOnSelectionState() {
+            if (currentUser && currentUser.uid === ADMIN_UID) {
+                selectionStatus.textContent = isSelectionOpen ? '진행 중' : '마감';
+                toggleSelectionBtn.textContent = isSelectionOpen ? '마니또 선택 마감하기' : '마니또 선택 시작하기';
+            }
+            renderEntries(currentEntries); // 저장된 데이터로 화면 다시 그리기
         }
-        // --- [로직 추가 끝] ---
-
-        renderEntries(entries);
-    });
-}
-
-// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 이 코드로 교체하세요 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-
-function updateUIBasedOnSelectionState() {
-    if (currentUser && currentUser.uid === ADMIN_UID) {
-        selectionStatus.textContent = isSelectionOpen ? '진행 중' : '마감';
-        toggleSelectionBtn.textContent = isSelectionOpen ? '마니또 선택 마감하기' : '마니또 선택 시작하기';
-    }
-    // 이제 데이터베이스를 다시 읽는 대신, 저장해둔 최신 데이터로 화면만 다시 그립니다.
-    renderEntries(currentEntries);
-}
-
-// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 여기까지 교체합니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
+        function createEntryCard(entry) {
+            const card = document.createElement('div');
+            card.className = 'p-4 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col justify-between transition-transform hover:scale-105';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'flex-grow';
+            contentDiv.innerHTML = `<p class="text-sm text-gray-500 mb-2">"${entry.introduction}"</p><p class="font-serif text-lg italic text-gray-800">"${entry.quote}"</p>`;
+            card.appendChild(contentDiv);
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'mt-4 pt-4 border-t border-gray-100';
+
+            const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
+
+            if (entry.authorId === currentUser.uid) {
+                const canEdit = (!isSelectionOpen && !entry.selectedBy) || isAdmin;
+                if (canEdit) {
+                    const editBtn = document.createElement('button');
+                    editBtn.textContent = '수정';
+                    editBtn.className = 'w-1/2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-l-md transition duration-300';
+                    editBtn.onclick = () => openEditModal(entry);
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = '삭제';
+                    deleteBtn.className = 'w-1/2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-r-md transition duration-300';
+                    deleteBtn.onclick = () => confirmDelete(entry.id);
+                    buttonContainer.append(editBtn, deleteBtn);
+                } else {
+                    const status = document.createElement('p');
+                    status.className = 'text-center text-blue-500 font-bold p-2 bg-blue-100 rounded-md';
+                    status.textContent = '내가 쓴 글';
+                    buttonContainer.appendChild(status);
+                }
+            } else {
+                if (entry.selectedBy) {
+                    const status = document.createElement('p');
+                    status.className = 'text-center text-red-500 font-bold p-2 bg-red-100 rounded-md';
+                    status.textContent = '임자 있어요';
+                    buttonContainer.appendChild(status);
+                } else if (isSelectionOpen && userHasSubmitted && !userHasSelected) {
+                    const selectBtn = document.createElement('button');
+                    selectBtn.textContent = '이 분의 마니또 되기';
+                    selectBtn.className = 'w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300';
+                    selectBtn.onclick = () => selectManito(entry.id);
+                    buttonContainer.appendChild(selectBtn);
+                } else {
+                    const status = document.createElement('p');
+                    status.className = 'text-center text-gray-500 font-bold p-2 bg-gray-100 rounded-md';
+                    if (!isSelectionOpen) status.textContent = '선택 대기 중';
+                    else if (!userHasSubmitted) status.textContent = '먼저 글을 제출해주세요';
+                    else if (userHasSelected) status.textContent = '선택 완료';
+                    else status.textContent = '선택 불가';
+                    buttonContainer.appendChild(status);
+                }
+                if (isAdmin) {
+                    const adminDeleteBtn = document.createElement('button');
+                    adminDeleteBtn.textContent = '관리자 삭제';
+                    adminDeleteBtn.className = 'w-full mt-2 bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-1 px-2 rounded-md transition duration-300';
+                    adminDeleteBtn.onclick = () => confirmDelete(entry.id);
+                    buttonContainer.appendChild(adminDeleteBtn);
+                }
+            }
+            card.appendChild(buttonContainer);
+            return card;
+        }
+
         function renderEntries(entries) {
             entriesList.innerHTML = '';
             entries.forEach(entry => {
@@ -312,85 +374,6 @@ function updateUIBasedOnSelectionState() {
                 entriesList.appendChild(card);
             });
         }
-
-       // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 여기부터 복사 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-
-function createEntryCard(entry) {
-    const card = document.createElement('div');
-    card.className = 'p-4 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col justify-between transition-transform hover:scale-105';
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'flex-grow';
-    contentDiv.innerHTML = `<p class="text-sm text-gray-500 mb-2">"${entry.introduction}"</p><p class="font-serif text-lg italic text-gray-800">"${entry.quote}"</p>`;
-    card.appendChild(contentDiv);
-    
-    const buttonContainer = document.createElement('div');
-    buttonContainer.className = 'mt-4 pt-4 border-t border-gray-100';
-
-    const isAdmin = currentUser && currentUser.uid === ADMIN_UID;
-
-    // Case 1: 내가 쓴 글일 경우
-    if (entry.authorId === currentUser.uid) {
-        // 수정/삭제가 가능한 조건: (선택 시작 전 && 선택 안됨) 이거나, 내가 관리자일 경우
-        const canEdit = (!isSelectionOpen && !entry.selectedBy) || isAdmin;
-
-        if (canEdit) {
-            const editBtn = document.createElement('button');
-            editBtn.textContent = '수정';
-            editBtn.className = 'w-1/2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-l-md transition duration-300';
-            editBtn.onclick = () => openEditModal(entry);
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = '삭제';
-            deleteBtn.className = 'w-1/2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-r-md transition duration-300';
-            deleteBtn.onclick = () => confirmDelete(entry.id);
-            
-            buttonContainer.append(editBtn, deleteBtn);
-        } else {
-            const status = document.createElement('p');
-            status.className = 'text-center text-blue-500 font-bold p-2 bg-blue-100 rounded-md';
-            status.textContent = '내가 쓴 글';
-            buttonContainer.appendChild(status);
-        }
-    } 
-    // Case 2: 다른 사람의 글일 경우
-    else {
-        if (entry.selectedBy) {
-            const status = document.createElement('p');
-            status.className = 'text-center text-red-500 font-bold p-2 bg-red-100 rounded-md';
-            status.textContent = '임자 있어요';
-            buttonContainer.appendChild(status);
-        } else if (isSelectionOpen && userHasSubmitted && !userHasSelected) {
-            const selectBtn = document.createElement('button');
-            selectBtn.textContent = '이 분의 마니또 되기';
-            selectBtn.className = 'w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300';
-            selectBtn.onclick = () => selectManito(entry.id);
-            buttonContainer.appendChild(selectBtn);
-        } else {
-            const status = document.createElement('p');
-            status.className = 'text-center text-gray-500 font-bold p-2 bg-gray-100 rounded-md';
-            if (!isSelectionOpen) status.textContent = '선택 대기 중';
-            else if (!userHasSubmitted) status.textContent = '먼저 글을 제출해주세요';
-            else if (userHasSelected) status.textContent = '선택 완료';
-            else status.textContent = '선택 불가';
-            buttonContainer.appendChild(status);
-        }
-
-        // 추가 조건: 내가 관리자라면, 다른 사람 글에 '관리자 삭제' 버튼을 추가
-        if (isAdmin) {
-            const adminDeleteBtn = document.createElement('button');
-            adminDeleteBtn.textContent = '관리자 삭제';
-            adminDeleteBtn.className = 'w-full mt-2 bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-1 px-2 rounded-md transition duration-300';
-            adminDeleteBtn.onclick = () => confirmDelete(entry.id);
-            buttonContainer.appendChild(adminDeleteBtn);
-        }
-    }
-
-    card.appendChild(buttonContainer);
-    return card;
-}
-
-// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 여기까지 복사 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         async function selectManito(docId) {
             if (!isSelectionOpen || !userHasSubmitted || userHasSelected) {
@@ -415,8 +398,6 @@ function createEntryCard(entry) {
             }
         });
 
-        // --- 수정 및 삭제 관련 함수들 ---
-
         function openEditModal(entry) {
             currentEditingDocId = entry.id;
             editIntroductionInput.value = entry.introduction;
@@ -432,12 +413,10 @@ function createEntryCard(entry) {
         saveEditBtn.addEventListener('click', async () => {
             const newIntroduction = editIntroductionInput.value.trim();
             const newQuote = editQuoteInput.value.trim();
-
             if (!newIntroduction || !newQuote) {
                 showModal('입력 오류', '모든 필드를 채워주세요.');
                 return;
             }
-
             try {
                 const entryRef = doc(db, "manito-entries", currentEditingDocId);
                 await updateDoc(entryRef, {
