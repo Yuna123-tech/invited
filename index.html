@@ -247,24 +247,50 @@
             });
         }
 
-        function setupEntriesListener() {
-            if (!currentUser) return;
-            onSnapshot(collection(db, "manito-entries"), (snapshot) => {
-                const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                entries.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+ // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 여기서부터 복사 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼
 
-                userHasSubmitted = entries.some(entry => entry.authorId === currentUser.uid);
-                userHasSelected = entries.some(entry => entry.selectedBy === currentUser.uid);
+function setupEntriesListener() {
+    if (!currentUser) return;
 
-                if (userHasSubmitted) {
-                    manitoFormContainer.style.display = 'none';
-                } else {
-                    manitoFormContainer.style.display = 'block';
-                }
-                
-                renderEntries(entries);
-            });
+    const manitoCollection = collection(db, "manito-entries");
+    onSnapshot(manitoCollection, (snapshot) => {
+        const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        entries.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+
+        userHasSubmitted = entries.some(entry => entry.authorId === currentUser.uid);
+        userHasSelected = entries.some(entry => entry.selectedBy === currentUser.uid);
+
+        // 내가 제출한 글이 있으면 폼 숨기기, 없으면 보여주기
+        if (userHasSubmitted) {
+            manitoFormContainer.style.display = 'none';
+        } else {
+            manitoFormContainer.style.display = 'block';
         }
+        
+        // --- [새로 추가된 로직] 내가 선택한 마니또 정보 표시 ---
+        const myManitoDisplay = document.getElementById('my-manito-display');
+        const myManitoIntroduction = document.getElementById('my-manito-introduction');
+        const myManitoQuote = document.getElementById('my-manito-quote');
+
+        // 내가 선택한 사람(mySelection)이 있는지 찾기
+        const mySelection = entries.find(entry => entry.selectedBy === currentUser.uid);
+
+        if (mySelection) {
+            // 있다면, 전용 섹션에 정보(소개, 글귀)를 채우고 보여주기
+            myManitoIntroduction.textContent = `"${mySelection.introduction}"`;
+            myManitoQuote.textContent = `"${mySelection.quote}"`;
+            myManitoDisplay.classList.remove('hidden');
+        } else {
+            // 없다면, 전용 섹션을 숨기기
+            myManitoDisplay.classList.add('hidden');
+        }
+        // --- [로직 추가 끝] ---
+
+        renderEntries(entries);
+    });
+}
+
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 여기까지 복사 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
         function updateUIBasedOnSelectionState() {
             if (currentUser && currentUser.uid === ADMIN_UID) {
