@@ -344,7 +344,19 @@
                     buttonContainer.appendChild(status);
                 }
             }
-
+// --- [추가 시작] 관리자용 삭제 버튼 ---
+// 현재 사용자가 관리자이고, 내가 쓴 글이 아닐 경우에만 관리자 삭제 버튼을 표시합니다.
+if (currentUser && currentUser.uid === ADMIN_UID && entry.authorId !== currentUser.uid) {
+    const adminDeleteBtn = document.createElement('button');
+    adminDeleteBtn.textContent = '관리자 삭제';
+    // 버튼 스타일을 작고 눈에 덜 띄게 만들어 사용자 버튼과 구분합니다.
+    adminDeleteBtn.className = 'w-full mt-2 bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-1 px-2 rounded-md transition duration-300';
+    adminDeleteBtn.onclick = () => confirmDelete(entry.id);
+    
+    // 기존 버튼 컨테이너에 추가합니다.
+    buttonContainer.appendChild(adminDeleteBtn);
+}
+// --- [추가 끝] ---
             card.appendChild(buttonContainer);
             return card;
         }
